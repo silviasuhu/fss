@@ -1,0 +1,42 @@
+{
+    "args": {},
+    "pre_checks": {
+        "in_tmux": {
+            "cmd": "if [[ -z ${TMUX} ]]; then echo \"ERROR: Not inside tmux session.\" 1>&2; return 1; fi"
+        }
+    },
+    "commands": {
+        "tmux_refresh_env": {
+            "description": "Proper ssh forward to tmux. Refreshes env variables with regexp '^(SSH|DISPLAY)' for all existing panes.",
+            "cmd": "refresh_tmux_env",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [
+                "in_tmux"
+            ],
+            "parameters": {}
+        },
+        "test": {
+            "description": "Test.",
+            "cmd": "echo '<<parama>> <<paramb>>'",
+            "bell": false,
+            "statistics": true,
+            "pre_checks": [],
+            "parameters": {
+                "parama": {
+                    "description": "Dummy description",
+                    "body": "--param <<VALUE>>",
+                    "optional": true,
+                    "type": "input"
+                },
+                "paramb": {
+                    "description": "Dummy description",
+                    "type": "query",
+                    "body": "--param <<VALUE>>",
+                    "optional": true,
+                    "query_cmd": "ls"
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,113 @@
+{
+    "args": {},
+    "pre_checks": {},
+    "commands": {
+        "git_cherry_pick": {
+            "description": "Cherry pick a commit.",
+            "cmd": "git cherry-pick -x <<commit>>",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_inside_git_repository"
+            ],
+            "parameters": {
+                "inputs": {
+                    "commit": {
+                        "description": "Commit to pick."
+                    }
+                }
+            }
+        },
+        "git_tag_new_stable_version": {
+            "description": "Create a new tag.",
+            "cmd": "git tag -a <<tag_date>>-<<branch>>-sstable -m 'Stable version' <<commit>>",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_inside_git_repository"
+            ],
+            "parameters": {
+                "tag_date": {
+                    "description": "Revision date. Format: YY.MM.DD",
+                    "type": "input"
+                },
+                "branch": {
+                    "description": "Branch of the revision.",
+                    "type": "input",
+                    "default": "master"
+                },
+                "commit": {
+                    "description": "Commit to mark.",
+                    "type": "input"
+                }
+            }
+        },
+        "git_track_remote_branch": {
+            "description": "Make local branch to track a remote branch.",
+            "cmd": "git branch -u origin/<<remote_branch>>",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_inside_git_repository"
+            ],
+            "parameters": {
+                "remote_branch": {
+                    "description": "Remote branch to track",
+                    "type": "query",
+                    "query_cmd": "git branch -r | sed 's/^ *origin\\/\/\/g'",
+                    "default": ""
+                }
+            }
+        },
+        "git_delete_local_branches_no_longer_on_remote": {
+            "description": "Remove tracking local branches no longer on remote.",
+            "cmd": "git fetch -p && git branch -vv | awk '/: gone]/{print $1}' | fzf -m | xargs git branch -d",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_inside_git_repository"
+            ],
+            "parameters": {}
+        },
+        "git_show_file_history": {
+            "description": "Show file history (even if it was deleted)",
+            "cmd": "git log --full-history -- <<file_path>>",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_inside_git_repository"
+            ],
+            "parameters": {
+                "file_path": {
+                    "description": "File to see history.",
+                    "type": "input"
+                }
+            }
+        },
+        "git_show_my_modified_files": {
+            "description": "Show all the files someone has modified so far",
+            "cmd": "git log --author='<<author>>' --all --name-only --pretty= | sort -u",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_inside_git_repository"
+            ],
+            "parameters": {
+                "author": {
+                    "description": "",
+                    "default": "Silvia",
+                    "type": "input"
+                }
+            }
+        },
+        "git_show_previous_targeted_revisions": {
+            "description": "Show previous targeted revisions `git reflog`",
+            "cmd": "git reflog",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_inside_git_repository"
+            ]
+        }
+    }
+}
