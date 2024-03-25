@@ -230,3 +230,5 @@ fss() {
     history -s "$cmdExec"
     eval "$cmdExec" || return 1
 }
+
+fss "$@"
