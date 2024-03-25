@@ -112,7 +112,7 @@ fss() {
 
     # Load .sh files from ../lib
 	local fss_path
-	fss_path=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+	fss_path=$( cd "$( dirname "$(readlink -f "${BASH_SOURCE[0]}")" )" >/dev/null 2>&1 && pwd )
 
 	local lib
 	while IFS= read -r -d '' lib; do
@@ -167,7 +167,7 @@ fss() {
         type=$(echo "$paramConf" | jq -r '.type // "input"')
         description=$(echo "$paramConf" | jq -r '.description // ""')
         body=$(echo "$paramConf" | jq -r '.body // "<<VALUE>>"')
-        optional=$(echo "$paramConf" | jq -r '.optional // "true"')
+        optional=$(echo "$paramConf" | jq -r '.optional // "false"')
         default=$(echo "$paramConf" | jq -r '.default // ""')
 
         if [[ "$type" == "query" ]]; then
@@ -193,6 +193,8 @@ fss() {
             fi
             if [[ "$addParameter" == "no" ]]; then
                 finalValue=""
+            elif [[ "$type" == "fix" ]]; then
+                finalValue="$body"
             elif [[ "$type" == "input" ]]; then
                 read -p "Type the '$paramName' ($description) [$default]: " value
                 value=${value:-$default}
@@ -207,8 +209,6 @@ fss() {
     # Add wrappers to the command
     cmdBell=$(echo "$cmdJson" | jq -r .bell)
     cmdStatistics=$(echo "$cmdJson" | jq -r .statistics)
-
-    timestampInit=$(date +%s);
 
     if [ "$cmdStatistics" == "true" ]; then
         cmdExec="reportCmdTiming $cmdExec"
