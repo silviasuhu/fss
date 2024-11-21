@@ -158,10 +158,16 @@ fss() {
         fi
     done
 
+    echo -n "$cmdExec"
+
     # Ask for the parameters of the command
     parameters=$(echo "$cmdJson" | jq -r '.parameters? | keys? | .[]?')
     for paramName in $parameters
     do
+        cmdToPrint="${cmdExec/"<<${paramName}>>"/"\e[4m<<${paramName}>>\e[0m"}"
+        echo -en "\033[1K" #<Clear the output printed by the last `echo -n` command.
+        echo -en "\r$cmdToPrint"
+
         paramConf=$(echo "$cmdJson" | jq -r .parameters."$paramName")
 
         type=$(echo "$paramConf" | jq -r '.type // "input"')
@@ -178,7 +184,7 @@ fss() {
             if [[ "$optional" == "true" ]]; then
                 queryCmd="$queryCmd; echo 'NONE'"
             fi
-            value=$(eval "$queryCmd" | fzf --height=50% --query="$default" --no-multi  --header="Select ${paramName}" --preview="${queryPreview}" --preview-window=right:60%:wrap ) || return
+            value=$(eval "$queryCmd" | fzf --height=50% --query="$default" --no-multi --preview="${queryPreview}" --preview-window=right:60%:wrap ) || return
             value=$(__trim "$value")
 
             if [[ "$value" == "NONE" ]]; then
@@ -219,16 +225,15 @@ fss() {
     fi
 
     if [ "$printOnly" == "true" ]; then
-        echo "$cmdExec"
         history -s "$cmdExec"
         return 0;
     fi
 
     # Execute the command
-    echo "Running '$cmdExec'"
+    echo -en "\033[1K" #<Clear the output printed by the last `echo -n` command.
+    echo -e "\r$cmdExec"
     echo ""
+
     history -s "$cmdExec"
     eval "$cmdExec" || return 1
 }
-
-fss "$@"
