@@ -72,6 +72,7 @@ FSS_CONF_FILE="$HOME/.fss.conf"
 if [[ ! -e "$FSS_CONF_FILE" ]]; then
     fss_dir="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
     echo "${fss_dir}/commands/*" > $FSS_CONF_FILE
+    mkdir "${fss_dir}/commands"
 fi
 
 fss() {
