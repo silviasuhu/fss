@@ -2,7 +2,7 @@
 
 ## Definition
 The FSS tool is used to:
-- Store and set an alias to parametrized commands.
+- Store and set an alias to parametrized and predefined commands.
 - Access and execute these commands in a fzf-fashion.
 
 ## Installation
