@@ -67,9 +67,14 @@
 ## 2. Add the json file to the fss configuration file, which is located in $HOME/.fss.conf
 ## 3. Run fss and the new command should be available
 
-fss() {
+FSS_CONF_FILE="$HOME/.fss.conf"
 
-    CONF_FILE="$HOME/.fss.conf"
+if [[ -e "$FSS_CONF_FILE" ]]; then
+    fss_dir="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
+    echo "${fss_dir}/commands/*" > $FSS_CONF_FILE
+fi
+
+fss() {
 
     usage() {
         echo -e "USAGE:"
@@ -124,7 +129,7 @@ fss() {
 	} )
 
     # Merge all commands into a temporal file
-    listOfFilesWithCommands=$(__getAllCommandFilesFromConfig "$CONF_FILE")
+    listOfFilesWithCommands=$(__getAllCommandFilesFromConfig "$FSS_CONF_FILE")
     fileWithAllCommands=$(__pushAllCommandsToTmpFile "${listOfFilesWithCommands[@]}")
 
     # Ask for the command to run unless we already know it
