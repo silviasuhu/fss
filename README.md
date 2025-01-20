@@ -30,4 +30,7 @@ The FSS tool is used to:
 5. Add your commands to the `fss/commands` directory.
    
 
-## Commands definition
+## Dependencies
+
+- Fzf command (https://github.com/junegunn/fzf)
+- Bat command (https://github.com/sharkdp/bat)
