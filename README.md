@@ -22,7 +22,7 @@ The FSS tool is used to:
    source $HOME/fss/bin/fss.sh
    ```
 
-4. Restart the bash instance.
+4. Reset the current bash instance.
    ```
    reset
    ```
