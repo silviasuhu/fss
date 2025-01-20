@@ -5,17 +5,18 @@
 ## Command:     fss
 ##
 ## * How it works:
-## When fss is called, a list of all the predefined commands is shown through the fzf tool and the
-## user only has to select which command wants to run.
-## There is the option to add arguments to the command, which will be asked through fzf as well.
+## When fss is called, a list of all the predefined commands is shown in a fzf-fashion. Then, user 
+## will select which command wants to run.
+## There is the option to add parameters to the command, which will be asked through fzf as well
+## after being selected the desired command to execute.
 ##
-## * How to add a new command:
+## * How to add a new predefined command:
 ## 1. Create a json file with the following structure:
 ## {
 ##     "commands": {
 ##         "<command_name1>": {
-##             "cmd": "<command to execute>",
-##             "description": "<command description with parameters surrounded by '<<' and '>>'>",
+##             "description": "<cmd description>",
+##             "cmd": "<command to execute with parameters surrounded by '<<' and '>>'>",
 ##             "parameters": {
 ##                 "<query1>": {
 ##                     "description": "<query description>",
@@ -64,7 +65,7 @@
 ##       not be executed
 ##     - The "pre_checks" section is optional
 ##
-## 2. Add the json file to the fss configuration file, which is located in $HOME/.fss.conf
+## 2. Add the json file to the fss configuration file, which is defined in $HOME/.fss.conf
 ## 3. Run fss and the new command should be available
 
 FSS_CONF_FILE="$HOME/.fss.conf"
@@ -76,7 +77,6 @@ if [[ ! -e "$FSS_CONF_FILE" ]]; then
 fi
 
 fss() {
-
     usage() {
         echo -e "USAGE:"
         echo -e "  fss [-ph][-c <command>]"

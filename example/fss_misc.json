@@ -1,21 +1,20 @@
 {
     "args": {},
     "pre_checks": {
-        "in_tmux": {
-            "cmd": "if [[ -z ${TMUX} ]]; then echo \"ERROR: Not inside tmux session.\" 1>&2; return 1; fi"
+        "wrkdir_is_inside_git_repository": {
+            "cmd": "if [[ $(git rev-parse --is-inside-work-tree 2>/dev/null) != 'true' ]]; then echo \"ERROR: ${PWD} is not inside a git repository\" 1>&2; return 1; fi"
+        },
+        "venv_is_active": {
+            "cmd": "if [[ -z ${VIRTUAL_ENV} ]]; then echo \"ERROR: No Python virtual environment activated\" 1>&2; return 1; fi"
+        },
+        "is_macos": {
+            "cmd": "if [[ \"$(uname -s)\" != 'Darwin' ]]; then echo 'ERROR: Not in a MacOs environment.' 1>&2; return 1; fi"
+        },
+        "is_workstation": {
+            "cmd": "if [[ \"$(uname -s)\" != 'Linux' ]]; then echo 'ERROR: Not in a Linux environment.' 1>&2; return 1; fi"
         }
     },
     "commands": {
-        "tmux_refresh_env": {
-            "description": "Proper ssh forward to tmux. Refreshes env variables with regexp '^(SSH|DISPLAY)' for all existing panes.",
-            "cmd": "refresh_tmux_env",
-            "bell": false,
-            "statistics": false,
-            "pre_checks": [
-                "in_tmux"
-            ],
-            "parameters": {}
-        },
         "test": {
             "description": "Test.",
             "cmd": "echo '<<parama>> <<paramb>>'",

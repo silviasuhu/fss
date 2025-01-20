@@ -1,0 +1,557 @@
+{
+    "pre_checks": {
+        "wrkdir_is_mongo_root": {
+            "cmd": "if [[ ! -d buildscripts ]]; then echo \"ERROR: ${PWD} is not a mongo working directory\" 1>&2; return 1; fi"
+        },
+        "wrkdir_is_inside_git_repository": {
+            "cmd": "if [[ $(git rev-parse --is-inside-work-tree 2>/dev/null) != 'true' ]]; then echo \"ERROR: ${PWD} is not inside a git repository\" 1>&2; return 1; fi"
+        },
+        "venv_is_active": {
+            "cmd": "if [[ -z ${VIRTUAL_ENV} ]]; then echo \"ERROR: No Python virtual environment activated\" 1>&2; return 1; fi"
+        },
+        "is_macos": {
+            "cmd": "if [[ \"$(uname -s)\" != 'Darwin' ]]; then echo 'ERROR: Not in a MacOs environment.' 1>&2; return 1; fi"
+        },
+        "is_workstation": {
+            "cmd": "if [[ \"$(uname -s)\" != 'Linux' ]]; then echo 'ERROR: Not in a Linxu environment.' 1>&2; return 1; fi"
+        }
+    },
+    "commands": {
+        "mongo_build": {
+            "description": "Ninja wrapper. Builds the binaries",
+            "cmd": "rmBuildStamp; tsp -fn nice -n 19 ninja -j400 <<ninjaFile>> <<target>> && stampSuccessfulBuild",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root"
+            ],
+            "parameters": {
+                "target": {
+                    "type": "query",
+                    "description": "target",
+                    "default": "install-devcore",
+                    "query_cmd": "echo -e 'install-mongod\ninstall-mongos\ninstall-servers\ninstall-core\ninstall-devcore\ninstall-all\ninstall-all-meta\ninstall-unittests'"
+                },
+                "ninjaFile": {
+                    "body": "-f <<VALUE>>",
+                    "type": "query",
+                    "description": "ninja file",
+                    "query_cmd": "ls *.ninja",
+                    "default": "",
+                    "element_preview": "batcat --color=always {}"
+                }
+            }
+        },
+        "mongo_clean": {
+            "description": "Ninja wrapper. Clean.",
+            "cmd": "ninja -j400 <<ninjaFile>> -t clean; ccache -c; rmBuildStamp",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root"
+            ],
+            "parameters": {
+                "ninjaFile": {
+                    "body": "-f <<VALUE>>",
+                    "type": "query",
+                    "description": "ninja file",
+                    "query_cmd": "ls *.ninja",
+                    "default": "",
+                    "element_preview": "batcat --color=always {}"
+                }
+            }
+        },
+        "mongo_build_json": {
+            "description": "Regenerates compile_commands.json, that is what ccls and other intellisense stuff will use to index files",
+            "cmd": "tsp -fn ./buildscripts/scons.py --build-profile=compiledb compiledb",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {}
+        },
+        "mongo_build_json_old": {
+            "description": "Regenerates compile_commands.json, that is what ccls and other intellisense stuff will use to index files",
+            "cmd": "tsp -fn ./buildscripts/scons.py --build-profile=compiledb compiledb",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {}
+        },
+        "mongo_pre_build": {
+            "description": "scons wrapper. Regenerates ninja file in case it's broken or doesn't exist.",
+            "cmd": "tsp -fn ./buildscripts/scons.py --build-profile=<<build_profile>> GDB_INDEX=0",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {
+                "build_profile": {
+                    "type": "query",
+                    "description": "build profile",
+                    "query_cmd": "sed -n '/LINUX_BUILD_PROFILES = {/,/}/p' ./site_scons/mongo/build_profiles.py | grep -o --color=never 'BuildProfileType\\.[A-Z_]*' | cut -d '.' -f2 | tr '[:upper:]' '[:lower:]'",
+                    "default": "fast",
+                    "element_preview": "sed -n '/LINUX_BUILD_PROFILES = {/,/}/p' ./site_scons/mongo/build_profiles.py | sed -n '/BuildProfileType\\.{}:/I,/^.*)/p'"
+                }
+            }
+        },
+        "mongo_pre_build_tsan": {
+            "description": "scons wrapper. Creates tsan.ninja file.",
+            "cmd": "tsp -fn ./buildscripts/scons.py --dbg=on --opt=on --use-libunwind=off --link-model=dynamic --variables-files=./etc/scons/mongodbtoolchain_stable_clang.vars --variables-files=./etc/scons/experimental_unified_ninja.vars --ninja ICECC=icecc CCACHE=ccache --sanitize=thread --allocator=system NINJA_PREFIX=tsan VARIANT_DIR=tsandebug",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {}
+        },
+        "mongo_pre_build_v44_v50_v60": {
+            "description": "scons wrapper. Regenerates ninja file in case it's broken or doesn't exist.",
+            "cmd": "tsp -fn ./buildscripts/scons.py --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars --opt=on --dbg=on --link-model=dynamic --ninja generate-ninja ICECC=icecc CCACHE=ccache",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {}
+        },
+        "mongo_activate_venv": {
+            "description": "Activates virtual environment for a mongo project",
+            "cmd": ". .venv/bin/activate",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root"
+            ],
+            "parameters": {}
+        },
+        "mongo_install_venv": {
+            "description": "Creates venv in mongo project and installs its requirements",
+            "cmd": "tsp -fn [[ -d .venv ]] && rm -r .venv; /opt/mongodbtoolchain/v4/bin/python3 -m venv .venv && . .venv/bin/activate && .venv/bin/python3 -m pip install 'poetry==1.5.1' && ./buildscripts/poetry_sync.sh",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root"
+            ],
+            "parameters": {}
+        },
+        "mongo_install_venv_old_80": {
+            "description": "Creates venv in mongo project and installs its requirements",
+            "cmd": "tsp -fn [[ -d .venv ]] && rm -r .venv; /opt/mongodbtoolchain/v4/bin/python3 -m venv .venv && . .venv/bin/activate && .venv/bin/python3 -m pip install 'poetry==1.5.1' && export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring && python3 -m poetry install --no-root --sync",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root"
+            ],
+            "parameters": {}
+        },
+        "mongo_install_venv_old_70": {
+            "description": "Creates venv in mongo project and installs its requirements",
+            "cmd": "tsp -fn [[ -d .venv ]] && rm -r .venv; /opt/mongodbtoolchain/v4/bin/python3 -m venv .venv && . .venv/bin/activate && .venv/bin/python3 -m pip install -r buildscripts/requirements.txt --use-feature=2020-resolver",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root"
+            ],
+            "parameters": {}
+        },
+        "mongo_run_local_test_js": {
+            "description": "Runs local jstests. The logs are executor.log, fixture.log and tests.log and are stored in lastTest directory",
+            "cmd": "tsp -fn ./buildscripts/resmoke.py run --installDir=./build/install/bin --storageEngine=wiredTiger --storageEngineCacheSizeGB=0.5 --dbpath=/tmp/testpath <<repeatTests>> --mongodSetParameters='{logComponentVerbosity: {command: 2, sharding: {verbosity: 2}}}' --jobs=1 <<runAllFeatureFlags>> --suite=<<jsSuite>> <<jsTest>> | mrlog | tee tests.log; (exit ${PIPESTATUS[0]})",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {
+                "jsSuite": {
+                    "type": "query",
+                    "description": "",
+                    "query_cmd": "./buildscripts/resmoke.py list-suites",
+                    "element_preview": "batcat --color=always ./buildscripts/resmokeconfig/suites/{}.yml",
+                    "default": "sharding"
+                },
+                "jsTest": {
+                    "type": "query",
+                    "optional": true,
+                    "description": "js file to test",
+                    "query_cmd": "find ./jstests -type f -name '*.js'",
+                    "element_preview": "batcat --color=always {}",
+                    "default": ""
+                },
+                "runAllFeatureFlags": {
+                    "type": "fix",
+                    "body": "--runAllFeatureFlagTests",
+                    "optional": true
+                },
+                "repeatTests": {
+                    "type": "input",
+                    "body": "--repeatTests <<VALUE>>",
+                    "optional": "true"
+                }
+            }
+        },
+        "mongo_run_local_test_bm": {
+            "description": "Runs local bm test.",
+            "cmd": "tsp -fn ./buildscripts/resmoke.py run --installDir=./build/install/bin --storageEngineCacheSizeGB=1 --jobs=1 --dbpath=/tmp/testpath --mongodSetParameters='{logComponentVerbosity: {sharding: {verbosity: 2}}}' --suite=<<bmSuite>> <<bmBinTest>> | mrlog | tee tests.log; (exit ${PIPESTATUS[0]})",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {
+                "bmSuite": {
+                    "type": "query",
+                    "description": "",
+                    "query_cmd": "./buildscripts/resmoke.py list-suites | grep --color=never benchmark",
+                    "element_preview": "batcat --color=always ./buildscripts/resmokeconfig/suites/{}.yml",
+                    "default": ""
+                },
+                "bmBinTest": {
+                    "type": "query",
+                    "description": "bm binary file to test",
+                    "query_cmd": "find ./build/install/bin -type f -name '*bm'",
+                    "element_preview": "",
+                    "default": ""
+                }
+            }
+        },
+        "mongo_run_local_unittest_binary": {
+            "description": "Runs unittest binary locally",
+            "cmd": "tsp -fn ./build/install/bin/<<unittest_bin>> | mrlog | tee tests.log; (exit ${PIPESTATUS[0]})",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root"
+            ],
+            "parameters": {
+                "unittest_bin": {
+                    "type": "query",
+                    "description": "binary to test",
+                    "query_cmd": "ls build/install/bin",
+                    "default": "db_s_server_test"
+                }
+            }
+        },
+        "mongo_run_local_unittest_file": {
+            "description": "Compiles and runs unittest file locally",
+            "cmd": "tsp -fn ninja -j400 -f <<ninjaFile>> +<<fileName>> | mrlog| tee tests.log; (exit ${PIPESTATUS[0]})",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {
+                "ninjaFile": {
+                    "type": "query",
+                    "description": "ninja file",
+                    "query_cmd": "ls *.ninja",
+                    "default": "",
+                    "element_preview": "batcat --color=always {}"
+                },
+                "fileName": {
+                    "type": "query",
+                    "description": "unittest file",
+                    "query_cmd": "find ./src/mongo -type f -name '*test.cpp' | sed -r 's/^.*\\/(.*)\\.cpp$/\\1/'",
+                    "element_preview": "",
+                    "default": ""
+                }
+            }
+        },
+        "mongo_run_eslint": {
+            "description": "Runs eslint over js tests, a linter for javascript",
+            "cmd": "./buildscripts/eslint.py lint",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {}
+        },
+        "mongo_run_cpplint": {
+            "description": "Runs quickcpplint, a linter for c++",
+            "cmd": "./buildscripts/quickcpplint.py lint",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {}
+        },
+        "mongo_format": {
+            "description": "Formats the source code according to the conversion adopted by all development teams.",
+            "cmd": "./buildscripts/clang_format.py format-my",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {}
+        },
+        "mongo_generate_matrix_suite": {
+            "description": "Generates matrix suite",
+            "cmd": "./buildscripts/resmoke.py generate-matrix-suites && bazel run //:format",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {}
+        },
+        "mongo_generate_matrix_suite_old": {
+            "description": "Generates matrix suite (Version pre-v8.1)",
+            "cmd": "./buildscripts/resmoke.py generate-matrix-suites",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {}
+        },
+        "mongo_find_suites_by_jstest": {
+            "description": "Find all the suites for a jstest",
+            "cmd": "./buildscripts/resmoke.py find-suites <<jsTest>>",
+            "bell": true,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root",
+                "venv_is_active"
+            ],
+            "parameters": {
+                "jsTest": {
+                    "type": "query",
+                    "description": "js test file",
+                    "query_cmd": "find ./jstests -type f -name '*.js'",
+                    "element_preview": "batcat --color=always {}",
+                    "default": ""
+                }
+            }
+        },
+        "evg_test_remotely": {
+            "description": "Create a remote patch",
+            "cmd": "evergreen patch --project <<project>> <<alias>> <<uncommitted>>",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [
+                "wrkdir_is_mongo_root"
+            ],
+            "parameters": {
+                "project": {
+                    "type": "query",
+                    "description": "project",
+                    "query_cmd": "evergreen list --projects | awk '/mongodb-mongo/{print $1}'",
+                    "default": "mongodb-mongo-master"
+                },
+                "alias": {
+                    "body": "--alias <<VALUE>>",
+                    "type": "query",
+                    "optional": true,
+                    "description": "alias",
+                    "query_cmd": "echo -e 'required\\nsharding\\nrun_unittests'",
+                    "default": "required"
+                },
+                "uncommitted": {
+                    "body": "--uncommitted",
+                    "type": "fix",
+                    "optional": "true",
+                    "default": "no"
+                }
+            }
+        },
+        "evg_finalize_patch": {
+            "description": "Schedule/finalize a patch",
+            "cmd": "evergreen finalize-patch -i <<patch_id>>",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {
+                "patch_id": {
+                    "type": "query",
+                    "description": "project",
+                    "query_cmd": "evergreen list-patches | awk '/ID : /{print $3}'",
+                    "element_preview": "evergreen list-patches --show-summary -i '{}'",
+                    "default": ""
+                }
+            }
+        },
+        "evg_cancel_patch": {
+            "description": "Cancel a patch",
+            "cmd": "evergreen cancel-patch -i <<patch_id>>",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {
+                "patch_id": {
+                    "type": "query",
+                    "description": "project",
+                    "query_cmd": "evergreen list-patches | awk '/ID : /{print $3}'",
+                    "element_preview": "evergreen list-patches --show-summary -i '{}'",
+                    "default": ""
+                }
+            }
+        },
+        "evg_show_patch": {
+            "description": "Show patch information",
+            "cmd": "evergreen list-patches --show-summary -i <<patch_id>>",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {
+                "patch_id": {
+                    "type": "query",
+                    "description": "project",
+                    "query_cmd": "evergreen list-patches | awk '/ID : /{print $3}'",
+                    "element_preview": "evergreen list-patches --show-summary -i '{}'",
+                    "default": ""
+                }
+            }
+        },
+        "evg_show_patches": {
+            "description": "Show all patches",
+            "cmd": "evergreen list-patches",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {}
+        },
+        "wt_dump_collection_names": {
+            "description": "Dump collection names from a _mdb_catalog.wt file",
+            "cmd": "<<wt_binary>> dump -x table:_mdb_catalog | tail -n +7 | awk 'NR%2 == 0 { print }' | xxd -r -p | bsondump --quiet | jq -r 'select(. | has(\"md\")) | [.ident, .ns] | @tsv' | sort",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {
+                "wt_binary": {
+                    "type": "input",
+                    "description": "Path to wt binary",
+                    "default": "wt"
+                }
+            }
+        },
+        "wt_dump_collection_data": {
+            "description": "Dump collection entries",
+            "cmd": "<<wt_binary>> dump -x table:<<collection>> | wt_to_mdb_bson.py -m dump",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {
+                "wt_binary": {
+                    "type": "input",
+                    "description": "Path to wt binary",
+                    "default": "wt"
+                },
+                "collection": {
+                    "type": "input",
+                    "description": "Collection ident"
+                }
+            }
+        },
+        "wt_dump_index_ns_names": {
+            "description": "Dump index collection names from a _mdb_catalog.wt file",
+            "cmd": "<<wt_binary>> dump -x table:_mdb_catalog | tail -n +7 | awk 'NR%2 == 0 { print }' | xxd -r -p | bsondump --quiet | jq -r 'select(. | has(\\\"idxIdent\\\")) | .ns as $nsT | .idxIdent | to_entries[] | [.value, $nsT, .key] | @tsv' | sort > wt_vs_index.tsv",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {
+                "wt_binary": {
+                    "type": "input",
+                    "description": "Path to wt binary"
+                }
+            }
+        },
+        "mlaunch_start_sharded_cluster": {
+            "description": "Launch a mongodb cluster",
+            "cmd": "mlaunch init --mongos <<num_mongos>> --shards <<num_shards>> --replicaset 1 --nodes <<num_nodes_rs>> --csrs 1 --verbose --binarypath <<binary_path>> --dir ~/tmp/mlaunch_data",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {
+                "num_mongos": {
+                    "type": "input",
+                    "default": "1"
+                },
+                "num_shards": {
+                    "type": "input",
+                    "default": "1"
+                },
+                "num_nodes_rs": {
+                    "type": "input",
+                    "default": "1"
+                },
+                "binary_path": {
+                    "type": "query",
+                    "query_cmd": "find /home/ubuntu/.local/m -iname 'bin' -type d; echo './build/install/bin'",
+                    "element_preview": "ls '{}'",
+                    "default": "./build/install/bin"
+                }
+            }
+        },
+        "mlaunch_start_standalone": {
+            "description": "Launch a mongodb standalone node",
+            "cmd": "mlaunch init --single --verbose --binarypath <<binary_path>> --dir ~/tmp/mlaunch_data",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {
+                "binary_path": {
+                    "type": "query",
+                    "query_cmd": "find /home/ubuntu/.local/m -iname 'bin' -type d; echo './build/install/bin'",
+                    "element_preview": "ls '{}'",
+                    "default": "./build/install/bin"
+                }
+            }
+        },
+        "mlaunch_start_replicaset": {
+            "description": "Launch a mongodb replicaset",
+            "cmd": "mlaunch init --replicaset --nodes <<num_nodes_rs>> --verbose --binarypath <<binary_path>> --dir ~/tmp/mlaunch_data",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {
+                "num_nodes_rs": {
+                    "type": "input",
+                    "default": "1"
+                },
+                "binary_path": {
+                    "type": "query",
+                    "query_cmd": "find /home/ubuntu/.local/m -iname 'bin' -type d; echo './build/install/bin'",
+                    "element_preview": "ls '{}'",
+                    "default": "./build/install/bin"
+                }
+            }
+        },
+        "mlaunch_stop": {
+            "description": "Stop an ongoing mlaunch process",
+            "cmd": "mlaunch stop --verbose --dir ~/tmp/mlaunch_data; pkill mongod; rm -r ~/tmp/mlaunch_data",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {}
+        },
+        "bazel_clean": {
+            "description": "Clear out bazel cache",
+            "cmd": "~/.local/bin/bazelisk clean --expunge",
+            "bell": false,
+            "statistics": false,
+            "pre_checks": [],
+            "parameters": {}
+        }
+    }
+}
