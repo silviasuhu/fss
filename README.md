@@ -34,6 +34,7 @@ The FSS tool is used to:
 
 - Fzf command (https://github.com/junegunn/fzf)
 - Bat command (https://github.com/sharkdp/bat)
+- Jq command (https://github.com/jqlang/jq)
 
 ## Configuration
 
