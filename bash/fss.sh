@@ -91,7 +91,8 @@ fss() {
             elif [[ "$type" == "fix" ]]; then
                 finalValue="$body"
             elif [[ "$type" == "input" ]]; then
-                read -p "Type the '$paramName' ($description) [$default]: " value
+                value=$(fzf --print-query --header="Type the '$paramName' above." --prompt="> " --phony --query="$default" --preview="echo '$description'" --height=5% --no-info < /dev/null)
+                # read -p "Type the '$paramName' ($description) [$default]: " value
                 value=${value:-$default}
                 finalValue="${body//"<<VALUE>>"/"$value"}"
             fi
