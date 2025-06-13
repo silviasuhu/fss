@@ -47,7 +47,7 @@ fss() {
         fi
     done
 
-    echo -n "$cmd"
+    # echo -n "$cmd"
 
     # Ask for the parameters of the command
     parameters=$(echo "$cmdJson" | jq -r '.parameters? | keys? | .[]?')
