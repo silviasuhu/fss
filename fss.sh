@@ -133,28 +133,28 @@ fss() {
 
     # Fetch the command configuration
     cmdJson=$(__getCommandFromJsonFile "$cmdName" "$fileWithAllCommands")
-    cmd=$(echo "$cmdJson" | jq -r .cmd)
+    cmd=$(jq -r .cmd <<<"$cmdJson")
 
-    preChecks=$(echo "$cmdJson" | jq -r '.pre_checks[]?')
+    preChecks=$(jq -r '.pre_checks[]?' <<<"$cmdJson")
     for preCheckName in $preChecks; do
         preCheckJson=$(jq -r ".pre_checks.\"$preCheckName\"" "$fileWithAllCommands")
-        preCheckCmd=$(echo "$preCheckJson" | jq -r .cmd)
+        preCheckCmd=$(jq -r .cmd <<<"$preCheckJson")
         eval "$preCheckCmd" || return 1
     done
 
-    parameters=$(echo "$cmdJson" | jq -r '.parameters? | keys? | .[]?')
+    parameters=$(jq -r '.parameters? | keys? | .[]?' <<<"$cmdJson")
     while IFS= read -r paramName; do
-        paramConf=$(echo "$cmdJson" | jq -r ".parameters.\"$paramName\"")
+        paramConf=$(jq -r --arg key "$paramName" '.parameters[$key]' <<<"$cmdJson")
 
-        type=$(echo "$paramConf" | jq -r '.type // "input"')
-        description=$(echo "$paramConf" | jq -r '.description // ""')
-        body=$(echo "$paramConf" | jq -r '.body // "<<VALUE>>"')
-        optional=$(echo "$paramConf" | jq -r '.optional // "false"')
-        default=$(echo "$paramConf" | jq -r '.default // ""')
+        type=$(jq -r '.type // "input"' <<< "$paramConf")
+        description=$(jq -r '.description // ""' <<< "$paramConf")
+        body=$(jq -r '.body // "<<VALUE>>"' <<< "$paramConf")
+        optional=$(jq -r '.optional // "false"' <<< "$paramConf")
+        default=$(jq -r '.default // ""' <<< "$paramConf")
 
         if [[ "$type" == "query" ]]; then
-            queryCmd=$(echo "$paramConf" | jq -r .query_cmd)
-            queryPreview=$(echo "$paramConf" | jq -r .element_preview)
+            queryCmd=$(jq -r '.query_cmd' <<<"$paramConf")
+            queryPreview=$(jq -r .element_preview <<<"$paramConf")
             [[ "$optional" == "true" ]] && queryCmd="$queryCmd; echo 'NONE'"
 
             value=$(eval "$queryCmd" | fzf --height 50% --query "$default" \
@@ -185,8 +185,8 @@ fss() {
     done <<< "$parameters"
 
     local cmdBell cmdStatistics
-    cmdBell=$(echo "$cmdJson" | jq -r .bell)
-    cmdStatistics=$(echo "$cmdJson" | jq -r .statistics)
+    cmdBell=$(jq -r .bell <<<"$cmdJson")
+    cmdStatistics=$(jq -r .statistics <<<"$cmdJson")
 
     [[ $cmdStatistics == "true" ]] && cmd="reportCmdTiming $cmd"
     [[ $cmdBell == "true" ]] && cmd="$cmd; ringBellAndSetExitCode \$?;"
