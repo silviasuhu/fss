@@ -144,20 +144,13 @@ fss() {
 
     parameters=$(echo "$cmdJson" | jq -r '.parameters? | keys? | .[]?')
     while IFS= read -r paramName; do
-        echo "0 $paramName" >> /tmp/debug.log
-
         paramConf=$(echo "$cmdJson" | jq -r ".parameters.\"$paramName\"")
 
         type=$(echo "$paramConf" | jq -r '.type // "input"')
-        echo "1 $type" >> /tmp/debug.log
         description=$(echo "$paramConf" | jq -r '.description // ""')
-        echo "2 $description" >> /tmp/debug.log
         body=$(echo "$paramConf" | jq -r '.body // "<<VALUE>>"')
-        echo "3 $body" >> /tmp/debug.log
         optional=$(echo "$paramConf" | jq -r '.optional // "false"')
-        echo "4 $optional" >> /tmp/debug.log
         default=$(echo "$paramConf" | jq -r '.default // ""')
-        echo "5 $default" >> /tmp/debug.log
 
         if [[ "$type" == "query" ]]; then
             queryCmd=$(echo "$paramConf" | jq -r .query_cmd)
@@ -181,23 +174,16 @@ fss() {
             finalValue="$body"
 
         elif [[ "$type" == "input" ]]; then
-            echo "6 $paramName" >> /tmp/debug.log
             value=$(fzf --print-query --header="Type '$paramName'." \
                         --prompt="> " --phony --query="$default" \
                         --preview="echo '$description'" \
                         --height=5% --no-info < /dev/null)
-            echo "7 $paramName" >> /tmp/debug.log
-            echo "8 $value" >> /tmp/debug.log
-            echo "9 $body" >> /tmp/debug.log
             finalValue=$(__replace "$body" '<<VALUE>>' "$value")
-            echo "10 $finalValue" >> /tmp/debug.log
         fi
 
         cmd=$(__replace "$cmd" "<<$paramName>>" "$finalValue")
-        echo "11 $cmd" >> /tmp/debug.log
     done <<< "$parameters"
 
-    echo "F $cmd" >> /tmp/debug.log
     local cmdBell cmdStatistics
     cmdBell=$(echo "$cmdJson" | jq -r .bell)
     cmdStatistics=$(echo "$cmdJson" | jq -r .statistics)
