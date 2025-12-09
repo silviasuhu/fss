@@ -136,11 +136,10 @@ fss() {
     cmd=$(jq -r .cmd <<<"$cmdJson")
 
     preChecks=$(jq -r '.pre_checks[]?' <<<"$cmdJson")
-    for preCheckName in $preChecks; do
-        preCheckJson=$(jq -r ".pre_checks.\"$preCheckName\"" "$fileWithAllCommands")
-        preCheckCmd=$(jq -r .cmd <<<"$preCheckJson")
+    while IFS= read -r preCheckName; do
+        preCheckCmd=$(jq -r --arg key "$preCheckName" '.pre_checks[$key].cmd' "$fileWithAllCommands")
         eval "$preCheckCmd" || return 1
-    done
+    done <<< "$preChecks"
 
     parameters=$(jq -r '.parameters? | keys? | .[]?' <<<"$cmdJson")
     while IFS= read -r paramName; do
