@@ -33,37 +33,68 @@ fi
 # --- Functions ---------------------------------------------------------
 
 __getAllCommandFilesFromConfig() {
-    if [[ ! -e "$FSS_CONF_FILE" ]]; then
-        echo "${SCRIPT_DIR}/commands/*" > "$FSS_CONF_FILE"
+    local confFile="${1:-$FSS_CONF_FILE}"
+    if [[ ! -e "$confFile" ]]; then
+        echo "${SCRIPT_DIR}/commands/*" > "$confFile"
         mkdir -p "${SCRIPT_DIR}/commands"
     fi
 
     local commandFiles=()
     while IFS= read -r line; do
         commandFiles+=("$line")
-    done < "$FSS_CONF_FILE"
+    done < "$confFile"
 
     printf '%s\n' "${commandFiles[@]}"
 }
 
+__expandGlob() {
+    # Expand a glob pattern into matching file paths (one per line) without eval.
+    # Works in bash and zsh; nullglob equivalent — no match means no output.
+    local pattern="$1"
+    if [ -n "$ZSH_VERSION" ]; then
+        setopt local_options null_glob
+        local matches=(${~pattern})
+        (( ${#matches} > 0 )) && printf '%s\n' "${matches[@]}"
+    else
+        local _restoreNullglob=0
+        shopt -q nullglob || _restoreNullglob=1
+        shopt -s nullglob
+        local matches=($pattern)
+        (( _restoreNullglob )) && shopt -u nullglob
+        (( ${#matches[@]} > 0 )) && printf '%s\n' "${matches[@]}"
+    fi
+}
+
+__warnDuplicateCommandNames() {
+    # Read (file<TAB>name) pairs from stdin, sort by name, warn on duplicates.
+    sort -t $'\t' -k2,2 -k1,1 | awk -F'\t' '
+        $2 == prev_name {
+            printf "fss: warning: command %s defined in both %s and %s; last wins\n", $2, prev_file, $1 > "/dev/stderr"
+        }
+        { prev_name = $2; prev_file = $1 }
+    '
+}
+
 __pushAllCommandsToTmpFile() {
     local commandFiles=()
-    local tmpFile=/tmp/fss_commands.json
+    local tmpFile
 
-    for file in "$@"; do
-        # Expand globs (this works in both bash and zsh)
-        for f in $(eval echo "$file"); do
+    for pattern in "$@"; do
+        while IFS= read -r f; do
             [[ -f "$f" ]] && commandFiles+=("$f")
-        done
+        done < <(__expandGlob "$pattern")
     done
 
-    # If no valid files found, return error
     [[ ${#commandFiles[@]} -eq 0 ]] && return 1
 
-    # Remove old tmp file
-    rm -f "$tmpFile"
+    # Warn on duplicate command names across files
+    {
+        for f in "${commandFiles[@]}"; do
+            jq -r --arg f "$f" '.commands? | keys[]? | "\($f)\t\(.)"' "$f" 2>/dev/null
+        done
+    } | __warnDuplicateCommandNames
 
-    # Merge JSON files
+    tmpFile=$(mktemp -t fss_commands.XXXXXX) || return 1
     jq -s 'reduce .[] as $item ({}; . * $item)' "${commandFiles[@]}" > "$tmpFile"
 
     echo "$tmpFile"
@@ -76,21 +107,26 @@ __getCommandFromJsonFile() {
 }
 
 __trim() {
-    echo "$1" | xargs
+    # Strip leading and trailing whitespace; preserve internal whitespace.
+    local s="$1"
+    s="${s#"${s%%[![:space:]]*}"}"
+    s="${s%"${s##*[![:space:]]}"}"
+    printf '%s' "$s"
 }
 
-# Safe replacement using printf
+# Literal substring replacement. Walks the string with prefix/suffix
+# stripping so neither regex metachars on the search side nor sed-style
+# specials (&, \) — including bash 5.2's `patsub_replacement` — get
+# interpreted in the replacement.
 __replace() {
-    local str="$1"
-    local search="$2"
-    local replace="$3"
-
-    # Escape search for use in sed (safe even with special chars)
-    local escaped_search
-    escaped_search=$(printf '%s\n' "$search" | sed 's/[][\/.^$*]/\\&/g')
-
-    # Use sed to do the replacement safely
-    printf '%s\n' "$str" | sed "s|$escaped_search|$replace|g"
+    local str="$1" search="$2" replace="$3"
+    [[ -z "$search" ]] && { printf '%s' "$str"; return; }
+    local out=""
+    while [[ "$str" == *"$search"* ]]; do
+        out+="${str%%"$search"*}$replace"
+        str="${str#*"$search"}"
+    done
+    printf '%s' "$out$str"
 }
 
 reportCmdTiming() {
@@ -129,7 +165,7 @@ fss() {
     cmdPreview="jq -C --tab '.commands.\"{}\"' $fileWithAllCommands"
     cmdName=$(jq -r '.commands | keys[]' "$fileWithAllCommands" | \
               fzf --height=50% --no-multi --preview="$cmdPreview" \
-                  --preview-window=right:60%:wrap) || return
+                  --preview-window=right:60%:wrap) || { rm -f "$fileWithAllCommands"; return; }
 
     # Fetch the command configuration
     cmdJson=$(__getCommandFromJsonFile "$cmdName" "$fileWithAllCommands")
@@ -138,8 +174,14 @@ fss() {
     preChecks=$(jq -r '.pre_checks[]?' <<<"$cmdJson")
     while IFS= read -r preCheckName; do
         [[ -z "$preCheckName" ]] && break
-        preCheckCmd=$(jq -r --arg key "$preCheckName" '.pre_checks[$key].cmd' "$fileWithAllCommands")
-        eval "$preCheckCmd" || return 1
+        local preCheckCmd preCheckDesc
+        preCheckCmd=$(jq -r --arg key "$preCheckName" '.pre_checks[$key].cmd // empty' "$fileWithAllCommands")
+        preCheckDesc=$(jq -r --arg key "$preCheckName" '.pre_checks[$key].description // empty' "$fileWithAllCommands")
+        if ! eval "$preCheckCmd"; then
+            echo "fss: pre-check '$preCheckName' failed${preCheckDesc:+ — $preCheckDesc}" >&2
+            rm -f "$fileWithAllCommands"
+            return 1
+        fi
     done <<< "$preChecks"
 
     parameters=$(jq -r '.parameters? | keys? | .[]?' <<<"$cmdJson")
@@ -161,7 +203,7 @@ fss() {
 
             value=$(eval "$queryCmd" | fzf --height 50% --query "$default" \
                     --no-multi --preview "$queryPreview" \
-                    --preview-window=right:60%:wrap) || return
+                    --preview-window=right:60%:wrap) || { rm -f "$fileWithAllCommands"; return; }
 
             value=$(__trim "$value")
 
@@ -177,7 +219,7 @@ fss() {
 
         elif [[ "$type" == "input" ]]; then
             value=$(fzf --print-query --header="Type '$paramName'." \
-                        --prompt="> " --phony --query="$default" \
+                        --prompt="> " --disabled --query="$default" \
                         --preview="echo '$description'" \
                         --height=5% --no-info < /dev/null)
             finalValue=$(__replace "$body" '<<VALUE>>' "$value")
@@ -195,18 +237,29 @@ fss() {
 
     # Insert back into command line (bash + zsh)
     if [ -n "$ZSH_VERSION" ]; then
-        # BUFFER="$cmd"
-        # CURSOR=${#BUFFER}
         print -z -- "$cmd"
     else
-        READLINE_LINE="$cmd"
-        READLINE_POINT=${#READLINE_LINE}
+        # Inside a `bind -x` keybinding, bash sets READLINE_LINE before
+        # invoking the function, so we can rewrite the prompt in place.
+        # Outside that context (called as a plain function), READLINE_LINE
+        # has no effect — fall back to printing the command.
+        if [[ -v READLINE_LINE ]]; then
+            READLINE_LINE="$cmd"
+            READLINE_POINT=${#READLINE_LINE}
+        else
+            printf '%s\n' "$cmd"
+        fi
     fi
+
+    rm -f "$fileWithAllCommands"
 }
 
 # --- Keybindings -------------------------------------------------------
+# Override defaults by exporting FSS_KEYBIND_BASH and/or FSS_KEYBIND_ZSH
+# before sourcing this file. Note that the default Ctrl+E shadows
+# Readline's `end-of-line` binding in bash and `end-of-line` in zsh.
 if [ -n "$ZSH_VERSION" ]; then
-    bindkey -s '^E' 'fss\n'
+    bindkey -s "${FSS_KEYBIND_ZSH:-^E}" 'fss\n'
 else
-    bind -x '"\C-e":fss'
+    bind -x "\"${FSS_KEYBIND_BASH:-\\C-e}\":fss"
 fi

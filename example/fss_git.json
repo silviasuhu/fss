@@ -1,5 +1,4 @@
 {
-    "args": {},
     "pre_checks": {
         "wrkdir_is_inside_git_repository": {
             "cmd": "if [[ $(git rev-parse --is-inside-work-tree 2>/dev/null) != 'true' ]]; then echo \"ERROR: ${PWD} is not inside a git repository\" 1>&2; return 1; fi"
@@ -18,10 +17,9 @@
                 "wrkdir_is_inside_git_repository"
             ],
             "parameters": {
-                "inputs": {
-                    "commit": {
-                        "description": "Commit to pick."
-                    }
+                "commit": {
+                    "description": "Commit to pick.",
+                    "type": "input"
                 }
             }
         },
