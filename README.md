@@ -123,7 +123,7 @@ Notes:
   | ------- | --------------------------------------------------------------------- | --------------- |
   | `query` | User picks from an `fzf` list whose options are `query_cmd`'s output. | `query_cmd`     |
   | `input` | User types the value (`default` pre-fills the prompt).                | —               |
-  | `fix`   | No prompt; `body` is inserted verbatim in place of the placeholder.   | `body`          |
+  | `fix`   | `body` is inserted verbatim. If `optional` is `true`, the user is first asked (via `fzf`) to include `body` or pick `NONE` to skip it. | `body`          |
 - For each parameter, the chosen/typed value is wrapped in `body` (with `<<VALUE>>`
   replaced by the value), and the result is substituted into `cmd` in place of
   `<<parameter_name>>`. If `body` is omitted it defaults to `<<VALUE>>`, i.e. the

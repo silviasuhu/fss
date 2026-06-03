@@ -215,7 +215,23 @@ fss() {
             fi
 
         elif [[ "$type" == "fix" ]]; then
-            finalValue="$body"
+            if [[ "$optional" == "true" ]]; then
+                # Optional fix parameters let the user decide whether the
+                # literal body is inserted. Mirror the query branch's "NONE"
+                # escape hatch: pick the body to include it, or NONE to skip.
+                value=$(printf '%s\nNONE\n' "$body" | fzf --height 50% \
+                        --no-multi --header="Include '$paramName'?" \
+                        --preview-window=right:60%:wrap) \
+                        || { rm -f "$fileWithAllCommands"; return; }
+                value=$(__trim "$value")
+                if [[ "$value" == "NONE" ]]; then
+                    finalValue=""
+                else
+                    finalValue="$body"
+                fi
+            else
+                finalValue="$body"
+            fi
 
         elif [[ "$type" == "input" ]]; then
             value=$(fzf --print-query --header="Type '$paramName'." \
